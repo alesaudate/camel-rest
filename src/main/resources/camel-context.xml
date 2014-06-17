@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans:beans xmlns:beans="http://www.springframework.org/schema/beans"
+	xmlns="http://camel.apache.org/schema/spring" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+	 http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring-2.13.1.xsd
+	">
+
+
+	<beans:bean id="camelTracer" class="org.apache.camel.processor.interceptor.Tracer">
+		<beans:property name="useJpa" value="false" />
+		<beans:property name="destination" ref="tracer" />
+		<beans:property name="logLevel" value="DEBUG" />
+	</beans:bean>
+
+	<beans:bean id="activemq" class="org.apache.activemq.camel.component.ActiveMQComponent">
+		<beans:property name="brokerURL" value="tcp://localhost:61616" />
+	</beans:bean>
+
+	<camelContext id="camel">
+
+		<endpoint id="tracer" uri="seda://tracer" />
+
+		<route>
+			<from uri="cxfrs://bean://restServices" />
+			<process ref="router" />
+			<recipientList>
+				<header>Route</header>
+			</recipientList>
+		</route>
+
+		<route>
+			<from uri="direct://healthService/GET" />
+			<setBody>
+				<simple>OK</simple>
+			</setBody>
+		</route>
+
+		<route>
+			<from uri="direct://personService/POST" />
+			<setBody>
+				<simple>${body[0]}</simple>
+			</setBody>
+			<to uri="activemq:people.new" pattern="InOnly" />
+			<setHeader headerName="CamelHttpResponseCode">
+				<constant>202</constant>
+			</setHeader>
+			<setBody>
+				<method ref="createResponse" method="make" />
+			</setBody>
+		</route>
+
+		<route>
+			<from uri="seda://tracer" />
+			<log message="Auditing: ${body}" loggingLevel="DEBUG" />
+			<to uri="vm://eventListener" pattern="InOnly" />
+		</route>
+	</camelContext>
+
+</beans:beans>

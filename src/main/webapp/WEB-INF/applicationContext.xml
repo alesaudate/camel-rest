@@ -11,7 +11,7 @@
 	
 	<import resource="classpath:cxfrs-context.xml"/>
 	<import resource="classpath:activemq-context.xml"/>
-	
+	<import resource="classpath:camel-context.xml"/>
 
 
 
