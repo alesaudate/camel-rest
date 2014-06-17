@@ -1,0 +1,88 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:cxf="http://camel.apache.org/schema/cxf"
+	xmlns:jaxrs="http://cxf.apache.org/jaxrs"
+	xsi:schemaLocation="
+       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://camel.apache.org/schema/cxf http://camel.apache.org/schema/cxf/camel-cxf.xsd
+       http://cxf.apache.org/jaxrs http://cxf.apache.org/schemas/jaxrs.xsd
+       http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd
+    ">
+
+
+	<import resource="classpath:META-INF/cxf/cxf.xml" />
+	<import resource="classpath:META-INF/cxf/cxf-servlet.xml" />
+
+
+
+	<bean id="camelTracer" class="org.apache.camel.processor.interceptor.Tracer">
+		<property name="useJpa" value="false" />
+		<property name="destination" ref="tracer" />
+		<property name="logLevel" value="DEBUG" />
+	</bean>
+
+	<bean id="activemq" class="org.apache.activemq.camel.component.ActiveMQComponent">
+		<property name="brokerURL" value="tcp://localhost:61616" />
+	</bean>
+
+
+	<!-- bean id="jsonProvider" class="org.apache.cxf.jaxrs.provider.JSONProvider"/ -->
+
+
+	<cxf:rsServer id="restServices" address="/"
+		loggingFeatureEnabled="true" loggingSizeLimit="20" skipFaultLogging="true">
+		<cxf:serviceBeans>
+			<ref bean="healthService" />
+			<ref bean="personService" />
+		</cxf:serviceBeans>
+	</cxf:rsServer>
+
+
+	<camelContext id="camel" xmlns="http://camel.apache.org/schema/spring">
+
+		<endpoint id="tracer" uri="seda://tracer" />
+		<dataFormats>
+			<jaxb id="jaxb" prettyPrint="true" contextPath="com.alesaudate.sample.model" />
+		</dataFormats>
+
+
+
+
+		<route>
+			<from uri="cxfrs://bean://restServices" />
+			<process ref="router" />
+			<recipientList>
+				<header>Route</header>
+			</recipientList>
+		</route>
+
+		<route>
+			<from uri="direct://healthService/GET" />
+			<setBody>
+				<simple>OK</simple>
+			</setBody>
+		</route>
+
+		<route>
+			<from uri="direct://personService/POST" />
+			<setBody>
+				<simple>${body[0]}</simple>
+			</setBody>
+			<setProperty propertyName="originalBody">
+				<simple>${body}</simple>
+			</setProperty>
+			<to uri="activemq:people.new" pattern="InOnly" />
+			<setHeader headerName="CamelHttpResponseCode">
+				<constant>202</constant>
+			</setHeader>
+			<setBody>
+				<method ref="createResponse" method="make" />
+			</setBody>
+		</route>
+		
+		<route>
+			<from uri="seda://tracer" />
+			<log message="Auditing: ${body}" loggingLevel="INFO" />
+		</route>
+	</camelContext>
+
+</beans>

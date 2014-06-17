@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:amq="http://activemq.apache.org/schema/core" 
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+	http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd
+	">
+
+	<amq:broker>
+	
+		<amq:persistenceAdapter>
+			<amq:levelDB directory="activemq/data" />
+		</amq:persistenceAdapter>
+	
+		<!-- The transport connectors ActiveMQ will listen to -->
+		<amq:transportConnectors>
+			<amq:transportConnector name="openwire"
+				uri="tcp://localhost:61616" />
+		</amq:transportConnectors>
+	</amq:broker>
+	
+	
+	<bean id="jmsTransactionManager"
+		class="org.springframework.jms.connection.JmsTransactionManager">
+		<property name="connectionFactory" ref="poolConnectionFactory" />
+	</bean>
+
+	<bean id="poolConnectionFactory" class="org.apache.activemq.pool.PooledConnectionFactory">
+		<property name="maxConnections" value="8" />
+		<property name="connectionFactory" ref="jmsConnectionFactory" />
+	</bean>
+
+	<bean id="jmsConnectionFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
+		<property name="brokerURL"
+			value="tcp://localhost:61616?broker.persistent=true&amp;broker.useJmx=true" />
+	</bean>
+	
+
+
+</beans>
